@@ -5,8 +5,8 @@ __pycache__/
 .ruff_cache/
 dist/
 build/
+.build*/
 *.egg-info/
 
 .DS_Store
 Thumbs.db
-
