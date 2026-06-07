@@ -1,8 +1,8 @@
 # Market Microstructure Engine
 
-Deterministic limit-order-book and matching-engine reference implementation for market microstructure study.
+Deterministic limit-order-book and matching-engine implementations in Python and C++20.
 
-This repo focuses on deterministic market mechanics: price-time priority, partial fills, market orders, cancellations, snapshots, deterministic simulations, and benchmarkable execution.
+The Python engine is the readable correctness oracle. The dependency-free C++20 engine implements the same price-time rules for native performance work. A shared deterministic workload checks final-state parity before comparing throughput and tail latency.
 
 ## Why This Exists
 
@@ -15,9 +15,12 @@ Strong quant engineering projects should avoid vague "stock prediction" claims. 
 - Partial fills and resting residual quantity.
 - Order cancellation by ID.
 - Top-of-book and depth snapshots.
-- Deterministic simulation and benchmark runner.
-- Unit tests for matching rules and edge cases.
-- No third-party runtime dependencies.
+- Python reference engine and C++20 native core.
+- Deterministic cross-language workload generation.
+- p50, p95, p99, and maximum per-order latency.
+- Python/C++ final-state parity gate across multiple seeds in CI.
+- Unit tests for matching rules and edge cases in both languages.
+- No third-party runtime dependencies in either engine.
 
 ## Engineering Scope
 
@@ -26,14 +29,16 @@ This repo uses a concrete, rule-heavy domain to exercise deterministic execution
 Relevant areas:
 
 - Quantitative systems: order-book mechanics, deterministic matching, queue priority, fills, cancels, and market-data replay roadmap.
-- Performance engineering: benchmark runner, latency-measurement roadmap, cache-aware data-structure comparison path.
-- Backend/systems engineering: clean domain model, dependency-free core, tests for edge cases, and a C++20 or Rust extension path.
+- Performance engineering: native implementation, latency distributions, deterministic workload comparison, and measured throughput.
+- Backend/systems engineering: clean domain model, dependency-free cores, CMake, strict compiler warnings, and tests for edge cases.
 
 ## Reviewer Fast Path
 
 - Start with `src/mm_engine/order_book.py` for matching rules and state transitions.
-- Review `tests/` for edge-case behavior around fills, cancels, and market orders.
-- Run `python -m mm_engine.benchmark --orders 25000` for the current benchmark path.
+- Compare `native/include/mm_engine/order_book.hpp` and `native/src/order_book.cpp` with the Python oracle.
+- Review `tests/` and `native/tests/` for matching behavior in both implementations.
+- Run `tools/compare_benchmarks.py` to verify parity and compare latency/throughput.
+- Read `docs/BENCHMARKS.md` for methodology and interpretation limits.
 - Read `docs/PORTFOLIO_REVIEW.md` for the technical review guide.
 
 ## Quick Start
@@ -43,7 +48,19 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -e .
 python -m unittest discover -s tests
-python -m mm_engine.benchmark --orders 25000
+python -m mm_engine.benchmark --orders 25000 --warmup 5000
+```
+
+Build and test the C++20 engine:
+
+```bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --parallel
+ctest --test-dir build --build-config Release --output-on-failure
+python tools/compare_benchmarks.py \
+  --native build/mm_engine_benchmark \
+  --orders 25000 \
+  --warmup 5000
 ```
 
 ## Example
@@ -67,12 +84,14 @@ This project covers:
 - Correctness around order matching rules.
 - Deterministic, testable systems behavior.
 - Awareness of market mechanics: spread, depth, queue priority, fills, cancels.
-- A credible foundation for a future low-latency C++ or Rust implementation.
+- Modern C++20 implementation with explicit ownership and integer price/quantity types.
+- Cross-language oracle testing before accepting performance results.
+- Reproducible latency and throughput measurement on identical generated order flow.
 
 ## Next Phase
 
-- Port the matching core to C++20 or Rust.
 - Add property-based tests.
 - Add pcap/ITCH-style event replay.
-- Add latency histograms and cache-aware data-structure comparisons.
+- Add Linux `perf` counter capture and cache-aware data-structure comparisons.
+- Compare tree-based levels with flat/sorted price-level storage.
 - Add Python bindings around the native engine.
