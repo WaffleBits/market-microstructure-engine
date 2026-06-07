@@ -27,3 +27,21 @@ jobs:
       - name: Run benchmark smoke test
         run: python -m mm_engine.benchmark --orders 1000
 
+      - name: Configure native engine
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build native engine
+        run: cmake --build build --config Release --parallel
+
+      - name: Run native tests
+        run: ctest --test-dir build --build-config Release --output-on-failure
+
+      - name: Verify Python and C++20 parity
+        run: |
+          for seed in 1 7 42 99; do
+            python tools/compare_benchmarks.py \
+              --native build/mm_engine_benchmark \
+              --orders 5000 \
+              --warmup 500 \
+              --seed "$seed"
+          done
