@@ -1,0 +1,24 @@
+{
+  "best_ask": 10012,
+  "best_bid": 10002,
+  "duration_seconds": 0.0800683,
+  "implementation": "python",
+  "latency_max_ns": 513200,
+  "latency_p50_ns": 1700,
+  "latency_p95_ns": 4400,
+  "latency_p99_ns": 6400,
+  "orders": 25000,
+  "orders_per_second": 312233.43,
+  "resting_orders": 5204,
+  "system": {
+    "cpu": "AMD Ryzen 7 9800X3D",
+    "machine": "Windows 11 desktop",
+    "orders": 25000,
+    "os": "Windows-10-10.0.26200-SP0",
+    "python": "3.11.15",
+    "seed": 42,
+    "warmup": 5000
+  },
+  "trades": 19730,
+  "warmup_orders": 5000
+}
