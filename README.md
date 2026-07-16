@@ -4,42 +4,18 @@ Deterministic limit-order-book and matching-engine implementations in Python and
 
 The Python engine is the readable correctness oracle. The dependency-free C++20 engine implements the same price-time rules for native performance work. A shared deterministic workload checks final-state parity before comparing throughput and tail latency.
 
-## Why This Exists
-
-Strong quant engineering projects should avoid vague "stock prediction" claims. A matching engine is more concrete: it forces clear rules, deterministic behavior, edge-case tests, and performance measurement.
+![Python matching-engine per-order latency percentiles](assets/latency_percentiles.png)
 
 ## Features
 
-- Price-time priority matching.
-- Limit and market orders.
-- Partial fills and resting residual quantity.
-- Order cancellation by ID.
+- Price-time priority matching for limit and market orders.
+- Partial fills, resting residual quantity, and cancel-by-ID.
 - Top-of-book and depth snapshots.
 - Python reference engine and C++20 native core.
 - Deterministic cross-language workload generation.
-- p50, p95, p99, and maximum per-order latency.
+- Per-order p50, p95, p99, and maximum latency plus throughput.
 - Python/C++ final-state parity gate across multiple seeds in CI.
-- Unit tests for matching rules and edge cases in both languages.
 - No third-party runtime dependencies in either engine.
-
-## Engineering Scope
-
-This repo uses a concrete, rule-heavy domain to exercise deterministic execution, correctness under edge cases, integer price representation, and benchmarkable behavior.
-
-Relevant areas:
-
-- Quantitative systems: order-book mechanics, deterministic matching, queue priority, fills, cancels, and market-data replay roadmap.
-- Performance engineering: native implementation, latency distributions, deterministic workload comparison, and measured throughput.
-- Backend/systems engineering: clean domain model, dependency-free cores, CMake, strict compiler warnings, and tests for edge cases.
-
-## Reviewer Fast Path
-
-- Start with `src/mm_engine/order_book.py` for matching rules and state transitions.
-- Compare `native/include/mm_engine/order_book.hpp` and `native/src/order_book.cpp` with the Python oracle.
-- Review `tests/` and `native/tests/` for matching behavior in both implementations.
-- Run `tools/compare_benchmarks.py` to verify parity and compare latency/throughput.
-- Read `docs/BENCHMARKS.md` for methodology and interpretation limits.
-- Read `docs/PORTFOLIO_REVIEW.md` for the technical review guide.
 
 ## Quick Start
 
@@ -48,10 +24,10 @@ python -m venv .venv
 .venv\Scripts\activate
 pip install -e .
 python -m unittest discover -s tests
-python -m mm_engine.benchmark --orders 25000 --warmup 5000
+python -m mm_engine.benchmark --orders 25000 --warmup 5000 --json
 ```
 
-Build and test the C++20 engine:
+Build and test the C++20 engine, then compare parity and speed:
 
 ```bash
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
@@ -62,6 +38,20 @@ python tools/compare_benchmarks.py \
   --orders 25000 \
   --warmup 5000
 ```
+
+## Measured Result
+
+Python engine, 25,000 measured orders after 5,000 warmup orders, seed 42, on an AMD Ryzen 7 9800X3D running Windows 11 with Python 3.11.
+
+| Metric | Value |
+| --- | ---: |
+| throughput | 312,233 orders/s |
+| latency p50 | 1,700 ns |
+| latency p95 | 4,400 ns |
+| latency p99 | 6,400 ns |
+| latency max | 513,200 ns |
+
+The raw record is in [results/python_benchmark_ryzen9800x3d.json](results/python_benchmark_ryzen9800x3d.json), and the chart above is generated from it by `scripts/plot_latency.py`. These numbers are host-specific. Run the benchmark on your target machine and compare repeated runs before drawing conclusions. The C++20 engine follows the same workload; see [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for its methodology and interpretation limits.
 
 ## Example
 
@@ -75,18 +65,7 @@ trades = book.add_limit_order("buy-1", Side.BUY, price=10100, quantity=40)
 print(trades[0].price, trades[0].quantity)
 ```
 
-Prices are represented as integer ticks to avoid floating-point execution errors.
-
-## Engineering Notes
-
-This project covers:
-
-- Correctness around order matching rules.
-- Deterministic, testable systems behavior.
-- Awareness of market mechanics: spread, depth, queue priority, fills, cancels.
-- Modern C++20 implementation with explicit ownership and integer price/quantity types.
-- Cross-language oracle testing before accepting performance results.
-- Reproducible latency and throughput measurement on identical generated order flow.
+Prices are integer ticks, which avoids floating-point execution errors.
 
 ## Next Phase
 
