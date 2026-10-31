@@ -1,73 +1,46 @@
 # Market Microstructure Engine
 
-Deterministic limit-order-book and matching-engine implementations in Python and C++20.
+A limit order book that matches orders by price, then time, written twice: a C++20
+engine for speed and a Python engine that checks it is correct.
 
-The Python engine is the readable correctness oracle. The dependency-free C++20 engine implements the same price-time rules for native performance work. A shared deterministic workload checks final-state parity before comparing throughput and tail latency.
+## Result
 
-![Python matching-engine per-order latency percentiles](assets/latency_percentiles.png)
+**5.07M orders/s at p50 150 ns** on the C++20 engine, a median of 7 runs over
+250,000 orders after 50,000 warmup orders (range 4.57M to 5.20M). In a paired run on
+the same workload, Python measured 340,149 orders/s and C++20 measured 5.15M, about
+15x, with matching final state.
 
-## Features
+| Latency | p50 | p95 | p99 | max |
+|---|---:|---:|---:|---:|
+| C++20 | 150 ns | 300 ns | 490 ns | 669,995 ns |
 
-- Price-time priority matching for limit and market orders.
-- Partial fills, resting residual quantity, and cancel-by-ID.
-- Top-of-book and depth snapshots.
-- Python reference engine and C++20 native core.
-- Deterministic cross-language workload generation.
-- Per-order p50, p95, p99, and maximum latency plus throughput.
-- Python/C++ final-state parity gate across multiple seeds in CI.
-- No third-party runtime dependencies in either engine.
+Measured on a Ryzen 7 9800X3D under WSL 2 with GCC 13.3, seed 42. The raw record is
+[results/cpp20_benchmark_ryzen9800x3d.json](results/cpp20_benchmark_ryzen9800x3d.json),
+and [docs/BENCHMARKS.md](docs/BENCHMARKS.md) covers the method and its limits. These
+numbers are specific to this host.
 
-## Quick Start
+## How it works
 
-```bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -e .
-python -m unittest discover -s tests
-python -m mm_engine.benchmark --orders 25000 --warmup 5000 --json
+```mermaid
+flowchart LR
+    W[Seeded order workload] --> P[Python engine<br/>readable oracle]
+    W --> C[C++20 engine<br/>native core]
+    P --> G{Final state equal?}
+    C --> G
+    G -->|yes| B[Compare latency and throughput]
+    G -->|no| F[Fail CI]
 ```
 
-Build and test the C++20 engine, then compare parity and speed:
+## Run it
 
 ```bash
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --config Release --parallel
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build --config Release --parallel
 ctest --test-dir build --build-config Release --output-on-failure
-python tools/compare_benchmarks.py \
-  --native build/mm_engine_benchmark \
-  --orders 25000 \
-  --warmup 5000
+python tools/compare_benchmarks.py --native build/mm_engine_benchmark --orders 25000 --warmup 5000
 ```
 
-## Measured Result
-
-C++20 engine, 250,000 measured orders after 50,000 warmup orders, seed 42, Release build with GCC 13.3, on an AMD Ryzen 7 9800X3D under WSL 2. Median of 7 runs.
-
-| Metric | Value |
-| --- | ---: |
-| throughput | 5.07M orders/s (range 4.57M to 5.20M) |
-| latency p50 | 150 ns |
-| latency p95 | 300 ns |
-| latency p99 | 490 ns |
-| latency max | 669,995 ns |
-
-On the same workload and host, a paired run measured the Python engine at 340,149 orders/s and C++20 at 5.15M orders/s, about 15x, with matching final state. The raw record is in [results/cpp20_benchmark_ryzen9800x3d.json](results/cpp20_benchmark_ryzen9800x3d.json).
-
-### Python engine
-
-Python engine, 25,000 measured orders after 5,000 warmup orders, seed 42, on an AMD Ryzen 7 9800X3D running Windows 11 with Python 3.11.
-
-| Metric | Value |
-| --- | ---: |
-| throughput | 312,233 orders/s |
-| latency p50 | 1,700 ns |
-| latency p95 | 4,400 ns |
-| latency p99 | 6,400 ns |
-| latency max | 513,200 ns |
-
-The raw record is in [results/python_benchmark_ryzen9800x3d.json](results/python_benchmark_ryzen9800x3d.json), and the chart above is generated from it by `scripts/plot_latency.py`. These numbers are host-specific. Run the benchmark on your target machine and compare repeated runs before drawing conclusions. The C++20 engine follows the same workload; see [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for its methodology and interpretation limits.
-
-## Example
+The Python engine runs on its own with `pip install -e .`, then
+`python -m unittest discover -s tests`.
 
 ```python
 from mm_engine import OrderBook, Side
@@ -79,12 +52,27 @@ trades = book.add_limit_order("buy-1", Side.BUY, price=10100, quantity=40)
 print(trades[0].price, trades[0].quantity)
 ```
 
-Prices are integer ticks, which avoids floating-point execution errors.
+## Design decisions
 
-## Next Phase
+1. **Two engines, one set of rules.** A fast engine with a subtle bug just produces
+   wrong answers quickly. The Python version is the readable reference, and the
+   C++ version has to match it.
+2. **Parity before speed.** The benchmark compares final state across seeds first.
+   A throughput number from an engine that disagrees with the oracle means nothing.
+3. **Prices are integer ticks.** Floating-point prices can make two equal levels
+   compare as different, so execution never touches a float.
 
-- Add property-based tests.
-- Add pcap/ITCH-style event replay.
-- Add Linux `perf` counter capture and cache-aware data-structure comparisons.
-- Compare tree-based levels with flat/sorted price-level storage.
-- Add Python bindings around the native engine.
+## Limitations
+
+- This is a matching engine, not an exchange. It has no network layer, persistence
+  or risk checks.
+- The workload is synthetic. Replaying real ITCH-style market data is future work.
+- The p50 is excellent but the maximum is about 670 µs. That tail has not been
+  investigated with hardware counters, and WSL adds noise.
+- Price levels have not been compared against flat, cache-aware structures yet.
+
+## More
+
+- [Benchmark method](docs/BENCHMARKS.md)
+- [Design notes](DESIGN.md)
+- [Microstructure notes](MICROSTRUCTURE_NOTES.md)
