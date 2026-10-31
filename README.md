@@ -41,6 +41,20 @@ python tools/compare_benchmarks.py \
 
 ## Measured Result
 
+C++20 engine, 250,000 measured orders after 50,000 warmup orders, seed 42, Release build with GCC 13.3, on an AMD Ryzen 7 9800X3D under WSL 2. Median of 7 runs.
+
+| Metric | Value |
+| --- | ---: |
+| throughput | 5.07M orders/s (range 4.57M to 5.20M) |
+| latency p50 | 150 ns |
+| latency p95 | 300 ns |
+| latency p99 | 490 ns |
+| latency max | 669,995 ns |
+
+On the same workload and host, a paired run measured the Python engine at 340,149 orders/s and C++20 at 5.15M orders/s, about 15x, with matching final state. The raw record is in [results/cpp20_benchmark_ryzen9800x3d.json](results/cpp20_benchmark_ryzen9800x3d.json).
+
+### Python engine
+
 Python engine, 25,000 measured orders after 5,000 warmup orders, seed 42, on an AMD Ryzen 7 9800X3D running Windows 11 with Python 3.11.
 
 | Metric | Value |
